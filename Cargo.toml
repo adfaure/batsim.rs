@@ -1,0 +1,23 @@
+[package]
+
+name = "rust-batsim"
+version = "0.0.1"
+authors = [ "FAURE Adrien <adrien.faure2@gmail.com>" ]
+
+[[bin]]
+name = "rust-batsim"
+path = "src/main.rs"
+
+[[bin]]
+name = "server"
+path = "src/server/main.rs"
+
+[[bin]]
+name = "client"
+path = "src/client/main.rs"
+
+[dependencies]
+zmq = "0.8"
+serde = "1.0"
+serde_derive = "1.0"
+serde_json = "1.0"

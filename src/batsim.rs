@@ -1,14 +1,12 @@
 extern crate serde_json;
 extern crate zmq;
 
-use std::rc::Rc;
-use std::collections::HashMap;
 use self::serde_json::Error;
 use std::fmt;
 
 pub trait Scheduler {
     fn simulation_begins(&mut self, timestamp: f64, nb_resources: i32, config: serde_json::Value);
-    fn on_job_submission(&mut self, timestamp: f64, job: Rc<Job>) -> Option<Vec<BatsimEvent>>;
+    fn on_job_submission(&mut self, timestamp: f64, job: Job) -> Option<Vec<BatsimEvent>>;
     ///TODO Instead of igiving a job id we should give a ref on the given job.
     fn on_job_completed(&mut self, timestamp: f64, job_id: String, status: String) -> Option<Vec<BatsimEvent>>;
     fn on_simulation_ends(&mut self, timestamp: f64);
@@ -20,7 +18,6 @@ pub struct Batsim<'a> {
     time: f64,
     nb_resources: i32,
     scheduler: &'a mut Scheduler,
-    jobs: HashMap<String, Rc<Job>>
 }
 
 #[derive(Serialize, Deserialize)]
@@ -127,8 +124,7 @@ impl<'a> Batsim<'a> {
             zmq_context: context,
             zmq_socket: socket,
             time: -1.0,
-            nb_resources: -1,
-            jobs: HashMap::new()
+            nb_resources: -1
         }
     }
 
@@ -195,8 +191,7 @@ impl<'a> Batsim<'a> {
                     //TODO It appears that the timestamp is the same as the one provided at the root
                     //message.
                     BatsimEvent::JOB_SUBMITTED{ref data, ..} => {
-                        let job = Rc::new(data.job.clone());
-                        self.jobs.insert(String::from(data.job.id.clone()), job.clone());
+                        let job = data.job.clone();
 
                         match self.scheduler.on_job_submission(self.time, job) {
                             Some(mut events) =>  res.events.append(&mut events),

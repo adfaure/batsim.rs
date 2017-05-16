@@ -1,6 +1,5 @@
 extern crate serde_json;
 
-use std::rc::Rc;
 //use self::serde_json::{Value, Error};
 use batsim::*;
 use std::collections::LinkedList;
@@ -8,8 +7,8 @@ use std::fmt::Write as FmtWrite;
 
 pub struct FCFS {
     pub nb_resources: i32,
-    pub running_job: Option<Rc<Job>>,
-    pub job_queue: LinkedList<Rc<Job>>,
+    pub running_job: Option<Job>,
+    pub job_queue: LinkedList<Job>,
     pub config: serde_json::Value
 }
 
@@ -41,7 +40,7 @@ impl FCFS {
                                 alloc: alloc
                             }
                             });
-                            self.running_job = Some(job.clone());
+                            self.running_job = Some(job);
                     }
                     None => {return None},
                 }
@@ -51,15 +50,14 @@ impl FCFS {
     }
 }
 
-
 impl Scheduler for FCFS {
     fn simulation_begins(&mut self, timestamp: f64, nb_resources: i32, config: serde_json::Value) {
         println!("[{}]FCFS Scheduler initialized: nb resources is {}", timestamp, nb_resources);
         self.config = config;
         self.nb_resources = nb_resources;
     }
-    fn on_job_submission(&mut self, timestamp: f64, job: Rc<Job>) -> Option<Vec<BatsimEvent>> {
-        self.job_queue.push_back(job.clone());
+    fn on_job_submission(&mut self, timestamp: f64, job: Job) -> Option<Vec<BatsimEvent>> {
+        self.job_queue.push_back(job);
         self.schedule_job(timestamp)
     }
     fn on_job_completed(&mut self, timestamp: f64, job_id: String, status: String) -> Option<Vec<BatsimEvent>> {

@@ -87,6 +87,7 @@ pub struct SimulationBegins {
     nb_resources: i32
 }
 
+#[allow(non_camel_case_types)]
 #[derive(Serialize, Deserialize)]
 #[serde(tag = "type")]
 pub enum BatsimEvent {
@@ -145,7 +146,7 @@ impl<'a> Batsim<'a> {
         };
 
         println!("Batsim initialized with {} resources", self.nb_resources);
-        self.send_message(self.get_nop().unwrap());
+        try!(self.send_message(self.get_nop().unwrap()));
         Ok(())
     }
 
@@ -178,11 +179,9 @@ impl<'a> Batsim<'a> {
     pub fn run_simulation(&mut self) -> Result<(), Error> {
         match self.init() {
             Ok(()) => println!("Simulation has been correctly initialized."),
-            Error => panic!("Could not initialize the simulation, aborting.")
+            _ => panic!("Could not initialize the simulation, aborting.")
         };
 
-        //We can create a function to call the scheduler with the conf and notify it that the
-        //simulation may begins.
         let mut next: Option<BatsimMessage> = self.get_next_message();
 
         'main: while let Some(msg) = next {
@@ -190,22 +189,25 @@ impl<'a> Batsim<'a> {
             let mut res = self.get_nop().unwrap();
             for event in msg.events {
                 match event {
-                    BatsimEvent::SIMULATION_BEGINS{ref data, ref timestamp} => {
+                    BatsimEvent::SIMULATION_BEGINS{..} => {
                         panic!("Received simulation_begins, this should not happends at this point");
                     },
-                    BatsimEvent::JOB_SUBMITTED{ref data, ref timestamp} => {
+                    //TODO It appears that the timestamp is the same as the one provided at the root
+                    //message.
+                    BatsimEvent::JOB_SUBMITTED{ref data, ..} => {
                         let job = Rc::new(data.job.clone());
                         self.jobs.insert(String::from(data.job.id.clone()), job.clone());
 
                         match self.scheduler.on_job_submission(self.time, job) {
                             Some(mut events) =>  res.events.append(&mut events),
-                            None => println!("No events")
+                            None => {}
                         };
                     },
+                    //
                     BatsimEvent::SIMULATION_ENDS{ref timestamp} => {
                         self.scheduler.on_simulation_ends(*timestamp);
                         next = None;
-                        self.send_message(res);
+                        try!(self.send_message(res));
                         continue 'main;
                     },
                     BatsimEvent::JOB_COMPLETED{ref data, ref timestamp} => {
@@ -217,7 +219,7 @@ impl<'a> Batsim<'a> {
                     _ => panic!("Unexpected event")
                 }
             }
-            self.send_message(res);
+            try!(self.send_message(res));
             next = self.get_next_message();
         }
         Ok(())

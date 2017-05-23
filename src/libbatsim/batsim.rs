@@ -4,11 +4,26 @@ extern crate zmq;
 use self::serde_json::Error;
 use std::fmt;
 
+/// Base trait to implement scheduler for batsim.
 pub trait Scheduler {
+    /// When the simulation in started, batsim will call `simulation_begins` to give to the
+    /// scheduler information on the simulations such as the number of resourcs available a
+    /// configuration (optional) and the original timestamp.
     fn simulation_begins(&mut self, timestamp: f64, nb_resources: i32, config: serde_json::Value);
+
+    /// When batsim receive a job from the submiter it will inform the scheduler.
+    /// This function can return an array of Batsim event to send back to batsim.
     fn on_job_submission(&mut self, timestamp: f64, job: Job) -> Option<Vec<BatsimEvent>>;
-    ///TODO Instead of igiving a job id we should give a ref on the given job.
+
+    /// When a job is finished batsim will inform the scheduler with this function.
+    ///
+    /// * `self` Take a reference mutable on the scheduler so we can update it.
+    /// * `timestamp` The current timestamp of the simulation.
+    /// * `job_id` The string id of the terminated job.
+    /// * `status` The return status of the job.
     fn on_job_completed(&mut self, timestamp: f64, job_id: String, status: String) -> Option<Vec<BatsimEvent>>;
+
+    /// This function is call a the end of the simulation.
     fn on_simulation_ends(&mut self, timestamp: f64);
 }
 
@@ -25,7 +40,7 @@ pub struct Job {
     pub id: String,
     pub res: i32,
     profile: String,
-    subtime: i32,
+    subtime: f64,
     walltime: i32
 }
 
@@ -141,7 +156,6 @@ impl<'a> Batsim<'a> {
             _ => panic!("We should receive a SIMULATION BEGIN at this point")
         };
 
-        println!("Batsim initialized with {} resources", self.nb_resources);
         try!(self.send_message(self.get_nop().unwrap()));
         Ok(())
     }
@@ -174,7 +188,7 @@ impl<'a> Batsim<'a> {
 
     pub fn run_simulation(&mut self) -> Result<(), Error> {
         match self.init() {
-            Ok(()) => println!("Simulation has been correctly initialized."),
+            Ok(()) => {},
             _ => panic!("Could not initialize the simulation, aborting.")
         };
 
@@ -220,13 +234,24 @@ impl<'a> Batsim<'a> {
         Ok(())
     }
 
+
+}
+
+pub fn allocate_job_event(time: f64, job: &Job, allocation : String) ->  BatsimEvent {
+    BatsimEvent::EXECUTE_JOB{
+        timestamp: time,
+        data: ExecuteJob{
+            job_id: job.id.clone(),
+            alloc: allocation
+        }
+    }
 }
 
 ///Convert a json fromated string into a typed rust struct `BatsimMessage`.
 pub fn read_batsim_message(msg_str: &str) -> Result<BatsimMessage, Error>  {
     let message: BatsimMessage = match serde_json::from_str(msg_str) {
         Ok(value) => value,
-        Err(why)  => panic!("{:?}", why)
+        Err(why)  => panic!("{:?} full str: {}", why, msg_str)
     };
 
     Ok(message)

@@ -1,15 +1,16 @@
 [package]
-
-name = "rust-batsim"
+name = "batsim"
 version = "0.0.1"
 authors = [ "FAURE Adrien <adrien.faure2@gmail.com>" ]
 
-[[bin]]
-name = "rust-batsim"
-path = "src/main.rs"
+[lib]
+name = "batsim"
+path = "src/libbatsim/lib.rs"
 
 [dependencies]
 zmq = "0.8"
 serde = "1.0"
 serde_derive = "1.0"
 serde_json = "1.0"
+log = "0.3.7"
+env_logger = "0.4.2"

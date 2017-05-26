@@ -23,6 +23,10 @@ pub trait Scheduler {
     /// * `status` The return status of the job.
     fn on_job_completed(&mut self, timestamp: f64, job_id: String, status: String) -> Option<Vec<BatsimEvent>>;
 
+    /// When the scheduler kill on or several jobs batsim acknoiwledge by sending back the id of the
+    /// killed job.
+    fn on_job_killed(&mut self, timestamp: f64, job_ids: Vec<String>) -> Option<Vec<BatsimEvent>>;
+
     /// This function is call a the end of the simulation.
     fn on_simulation_ends(&mut self, timestamp: f64);
 }
@@ -41,7 +45,7 @@ pub struct Job {
     pub res: i32,
     profile: String,
     subtime: f64,
-    walltime: i32
+    walltime: f64
 }
 
 impl Clone for Job {
@@ -82,9 +86,25 @@ pub struct JobSubmitted{
 }
 
 #[derive(Serialize, Deserialize)]
+pub struct RejectJob{
+        job_id: String,
+}
+
+
+#[derive(Serialize, Deserialize)]
 pub struct ExecuteJob {
         pub job_id: String,
         pub alloc: String
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct KillJob {
+        pub job_ids: Vec<String>,
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct JobKilled {
+        pub job_ids: Vec<String>,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -118,9 +138,21 @@ pub enum BatsimEvent {
         timestamp: f64,
         data: JobCompleted
     },
+    JOB_KILLED {
+        timestamp: f64,
+        data: JobKilled
+    },
     EXECUTE_JOB {
         timestamp: f64,
         data: ExecuteJob
+    },
+    REJECT_JOB {
+        timestamp: f64,
+        data: RejectJob
+    },
+    KILL_JOB {
+        timestamp: f64,
+        data: KillJob
     }
 }
 
@@ -225,6 +257,12 @@ impl<'a> Batsim<'a> {
                             None => println!("No events")
                         };
                     },
+                    BatsimEvent::JOB_KILLED{ref data, ref timestamp} => {
+                       match self.scheduler.on_job_killed(*timestamp, data.job_ids.clone()) {
+                            Some(mut events) =>  res.events.append(&mut events),
+                            None => println!("No events")
+                        };
+                    },
                     _ => panic!("Unexpected event")
                 }
             }
@@ -246,6 +284,29 @@ pub fn allocate_job_event(time: f64, job: &Job, allocation : String) ->  BatsimE
         }
     }
 }
+
+pub fn reject_job_event(time: f64, job: &Job) ->  BatsimEvent {
+    BatsimEvent::REJECT_JOB{
+        timestamp: time,
+        data: RejectJob{
+            job_id: job.id.clone(),
+        }
+    }
+}
+
+pub fn kill_jobs_event(time: f64, jobs: Vec<&Job>) ->  BatsimEvent {
+    let mut job_ids = vec![];
+    for job in jobs {
+        job_ids.push(job.id.clone());
+    }
+    BatsimEvent::KILL_JOB{
+        timestamp: time,
+        data: KillJob{
+            job_ids: job_ids,
+        }
+    }
+}
+
 
 ///Convert a json fromated string into a typed rust struct `BatsimMessage`.
 pub fn read_batsim_message(msg_str: &str) -> Result<BatsimMessage, Error>  {

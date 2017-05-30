@@ -10,11 +10,11 @@ pub trait Scheduler {
     /// When the simulation in started, batsim will call `simulation_begins` to give to the
     /// scheduler information on the simulations such as the number of resourcs available a
     /// configuration (optional) and the original timestamp.
-    fn simulation_begins(&mut self, timestamp: f64, nb_resources: i32, config: serde_json::Value);
+    fn simulation_begins(&mut self, timestamp: &mut f64, nb_resources: i32, config: serde_json::Value);
 
     /// When batsim receive a job from the submiter it will inform the scheduler.
     /// This function can return an array of Batsim event to send back to batsim.
-    fn on_job_submission(&mut self, timestamp: f64, job: Job) -> Option<Vec<BatsimEvent>>;
+    fn on_job_submission(&mut self, timestamp:  &mut f64, job: Job) -> Option<Vec<BatsimEvent>>;
 
     /// When a job is finished batsim will inform the scheduler with this function.
     ///
@@ -23,17 +23,24 @@ pub trait Scheduler {
     /// * `job_id` The string id of the terminated job.
     /// * `status` The return status of the job.
     fn on_job_completed(&mut self,
-                        timestamp: f64,
+                        timestamp: &mut f64,
                         job_id: String,
                         status: String)
                         -> Option<Vec<BatsimEvent>>;
 
     /// When the scheduler kill on or several jobs batsim acknoiwledge by sending back the id of the
     /// killed job.
-    fn on_job_killed(&mut self, timestamp: f64, job_ids: Vec<String>) -> Option<Vec<BatsimEvent>>;
+    fn on_job_killed(&mut self, timestamp:&mut f64, job_ids: Vec<String>) -> Option<Vec<BatsimEvent>>;
+
+    /// The function is called at the reception of a message
+    /// Before loop trhough each event and call `on_*` functions.
+    fn on_message_received_end(&mut self, timestamp:&mut f64) -> Option<Vec<BatsimEvent>>;
+
+    /// The function is called just before sending back events to batsim.
+    fn on_message_received_begin(&mut self, timestamp:&mut f64) -> Option<Vec<BatsimEvent>>;
 
     /// This function is call a the end of the simulation.
-    fn on_simulation_ends(&mut self, timestamp: f64);
+    fn on_simulation_ends(&mut self, timestamp: &mut f64);
 }
 
 pub struct Batsim<'a> {
@@ -43,6 +50,7 @@ pub struct Batsim<'a> {
     nb_resources: i32,
     scheduler: &'a mut Scheduler,
 }
+
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Job {
@@ -187,15 +195,17 @@ impl<'a> Batsim<'a> {
                 ref data,
                 ref timestamp,
             } => {
-                self.time = *timestamp;
+                let mut temp_timestamp = *timestamp;
                 self.nb_resources = data.nb_resources;
                 self.scheduler
-                    .simulation_begins(*timestamp, data.nb_resources, data.config.clone());
+                    .simulation_begins(&mut temp_timestamp, data.nb_resources, data.config.clone());
+                self.time = temp_timestamp;
             }
             _ => panic!("We should receive a SIMULATION BEGIN at this point"),
         };
-
-        try!(self.send_message(self.get_nop().unwrap()));
+        let mut res = self.get_nop().unwrap();
+        res.now = self.time;
+        try!(self.send_message(res));
         Ok(())
     }
 
@@ -240,7 +250,14 @@ impl<'a> Batsim<'a> {
 
         'main: while let Some(msg) = next {
             self.time = msg.now;
+            let mut schedule_timestamp: f64 = msg.now;
             let mut res = self.get_nop().unwrap();
+
+            match self.scheduler.on_message_received_begin(&mut schedule_timestamp) {
+                    Some(mut events) => res.events.append(&mut events),
+                    None => {}
+            };
+
             for event in msg.events {
                 match event {
                     BatsimEvent::SIMULATION_BEGINS { .. } => {
@@ -252,14 +269,14 @@ impl<'a> Batsim<'a> {
                     BatsimEvent::JOB_SUBMITTED { ref data, .. } => {
                         let job = data.job.clone();
 
-                        match self.scheduler.on_job_submission(self.time, job) {
+                        match self.scheduler.on_job_submission(&mut schedule_timestamp, job) {
                             Some(mut events) => res.events.append(&mut events),
                             None => {}
                         };
                     }
                     //
                     BatsimEvent::SIMULATION_ENDS { ref timestamp } => {
-                        self.scheduler.on_simulation_ends(*timestamp);
+                        self.scheduler.on_simulation_ends(&mut schedule_timestamp);
                         next = None;
                         try!(self.send_message(res));
                         continue 'main;
@@ -269,7 +286,7 @@ impl<'a> Batsim<'a> {
                         ref timestamp,
                     } => {
                         match self.scheduler
-                                  .on_job_completed(*timestamp,
+                                  .on_job_completed(&mut schedule_timestamp,
                                                     data.job_id.clone(),
                                                     data.status.clone()) {
                             Some(mut events) => res.events.append(&mut events),
@@ -281,7 +298,7 @@ impl<'a> Batsim<'a> {
                         ref timestamp,
                     } => {
                         match self.scheduler
-                                  .on_job_killed(*timestamp, data.job_ids.clone()) {
+                                  .on_job_killed(&mut schedule_timestamp, data.job_ids.clone()) {
                             Some(mut events) => res.events.append(&mut events),
                             None => {}
                         };
@@ -289,6 +306,13 @@ impl<'a> Batsim<'a> {
                     _ => panic!("Unexpected event"),
                 }
             }
+
+            match self.scheduler.on_message_received_end(&mut schedule_timestamp) {
+                    Some(mut events) => res.events.append(&mut events),
+                    None => {}
+            };
+
+            res.now = schedule_timestamp;
             try!(self.send_message(res));
             next = self.get_next_message();
         }

@@ -112,20 +112,17 @@ impl fmt::Display for Job {
     }
 }
 
-
-#[derive(Debug, Serialize, Deserialize)]
-pub struct Profile {
-    #[serde(rename = "type")]
-    pub profile_type: String,
-    pub delay: f64,
-}
-
-impl Clone for Profile {
-    fn clone(&self) -> Profile {
-        Profile {
-            profile_type: self.profile_type.clone(),
-            delay: self.delay,
-        }
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(tag = "type")]
+pub enum Profile {
+    #[serde(rename = "delay")]
+    Delay {
+        delay: f64,
+    },
+    #[serde(rename = "msg_par_hg")]
+    MsgParHg {
+        com: f64,
+        cpu: f64
     }
 }
 

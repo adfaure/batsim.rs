@@ -1,6 +1,10 @@
-extern crate serde_json;
+extern crate log;
+extern crate env_logger;
 extern crate zmq;
 
+extern crate serde_json;
+
+use json_protocol::*;
 use self::serde_json::Error;
 use std::fmt;
 use std::str::FromStr;
@@ -14,12 +18,17 @@ pub trait Scheduler {
     fn simulation_begins(&mut self,
                          timestamp: &mut f64,
                          nb_resources: i32,
-                         config: serde_json::Value) -> Option<Vec<BatsimEvent>>;
+                         config: serde_json::Value)
+                         -> Option<Vec<BatsimEvent>>;
 
     /// When batsim receive a job from the submiter it will inform the scheduler.
     /// This function can return an array of Batsim event to send back to batsim.
     #[warn(unused_variables)]
-    fn on_job_submission(&mut self, timestamp: &mut f64, job: Job, profile: Option<Profile>) -> Option<Vec<BatsimEvent>>;
+    fn on_job_submission(&mut self,
+                         timestamp: &mut f64,
+                         job: Job,
+                         profile: Option<Profile>)
+                         -> Option<Vec<BatsimEvent>>;
 
     /// When a job is finished batsim will inform the scheduler with this function.
     ///
@@ -65,15 +74,6 @@ pub struct Batsim<'a> {
 }
 
 
-#[derive(Debug, Serialize, Deserialize)]
-pub struct Job {
-    pub id: String,
-    pub res: i32,
-    pub profile: String,
-    pub subtime: f64,
-    pub walltime: f64,
-}
-
 impl Job {
     /// Split the job id in two parts `(workload id, job id)` as defined n batsim.
     pub fn split_id(id: &String) -> (String, String) {
@@ -101,6 +101,7 @@ impl Clone for Job {
     }
 }
 
+
 impl fmt::Display for Job {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f,
@@ -110,103 +111,6 @@ impl fmt::Display for Job {
                self.subtime,
                self.walltime)
     }
-}
-
-#[derive(Clone, Debug, Serialize, Deserialize)]
-#[serde(tag = "type")]
-pub enum Profile {
-    #[serde(rename = "delay")]
-    Delay {
-        delay: f64,
-    },
-    #[serde(rename = "msg_par_hg")]
-    MsgParHg {
-        com: f64,
-        cpu: f64
-    }
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-pub struct BatsimMessage {
-    now: f64,
-    pub events: Vec<BatsimEvent>,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-pub struct SubmitJob {
-    job_id: String,
-    job: Job,
-    profile: Option<Profile>
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-pub struct Notify {
-    #[serde(rename = "type")]
-    notify_type: String,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-pub struct JobSubmitted {
-    job_id: String,
-    job: Job,
-    profile: Option<Profile>
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-pub struct RejectJob {
-    job_id: String,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-pub struct ExecuteJob {
-    pub job_id: String,
-    pub alloc: String,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-pub struct KillJob {
-    pub job_ids: Vec<String>,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-pub struct JobKilled {
-    pub job_ids: Vec<String>,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-pub struct JobCompleted {
-    pub job_id: String,
-    pub status: String,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-pub struct SimulationBegins {
-    config: serde_json::Value,
-    nb_resources: i32,
-}
-
-#[allow(non_camel_case_types)]
-#[derive(Debug, Serialize, Deserialize)]
-#[serde(tag = "type")]
-pub enum BatsimEvent {
-    ///From batsim to sched
-    SIMULATION_BEGINS {
-        timestamp: f64,
-        data: SimulationBegins,
-    },
-    JOB_SUBMITTED { timestamp: f64, data: JobSubmitted },
-    SIMULATION_ENDS { timestamp: f64 },
-    JOB_COMPLETED { timestamp: f64, data: JobCompleted },
-    JOB_KILLED { timestamp: f64, data: JobKilled },
-
-    /// From sched to batsim
-    EXECUTE_JOB { timestamp: f64, data: ExecuteJob },
-    REJECT_JOB { timestamp: f64, data: RejectJob },
-    KILL_JOB { timestamp: f64, data: KillJob },
-
-    /// Dynamic submit feature
-    SUBMIT_JOB { timestamp: f64, data: SubmitJob },
-    NOTIFY { timestamp: f64, data: Notify },
 }
 
 impl<'a> Batsim<'a> {
@@ -240,7 +144,10 @@ impl<'a> Batsim<'a> {
             } => {
                 let mut temp_timestamp = *timestamp;
                 self.nb_resources = data.nb_resources;
-                match self.scheduler.simulation_begins(&mut temp_timestamp, data.nb_resources, data.config.clone()) {
+                match self.scheduler
+                          .simulation_begins(&mut temp_timestamp,
+                                             data.nb_resources,
+                                             data.config.clone()) {
                     Some(mut events) => res.events.append(&mut events),
                     None => {}
                 }
@@ -294,6 +201,8 @@ impl<'a> Batsim<'a> {
         let mut next: Option<BatsimMessage> = self.get_next_message();
 
         'main: while let Some(msg) = next {
+            trace!("-----------------------------------------");
+            trace!("Received msg: {:?}", msg);
             self.time = msg.now;
             let mut schedule_timestamp: f64 = msg.now;
             let mut res = self.get_nop().unwrap();
@@ -310,11 +219,12 @@ impl<'a> Batsim<'a> {
                         panic!("Received simulation_begins,
                                this should not happends at this point");
                     }
-                    //TODO It appears that the timestamp is the same as the one provided at the root
-                    //message.
-                    BatsimEvent::JOB_SUBMITTED  { ref data, .. } => {
+                    BatsimEvent::JOB_SUBMITTED { ref data, ref timestamp } => {
+
                         match self.scheduler
-                                  .on_job_submission(&mut schedule_timestamp,  data.job.clone(), data.profile.clone()) {
+                                  .on_job_submission(&mut schedule_timestamp,
+                                                     data.job.clone(),
+                                                     data.profile.clone()) {
                             Some(mut events) => res.events.append(&mut events),
                             None => {}
                         };
@@ -363,6 +273,8 @@ impl<'a> Batsim<'a> {
             res.now = schedule_timestamp;
             try!(self.send_message(res));
             next = self.get_next_message();
+            trace!("Send msg to batsim");
+            trace!("-----------------------------------------");
         }
         Ok(())
     }
@@ -395,14 +307,14 @@ pub fn notify_event(time: f64, n_type: String) -> BatsimEvent {
 pub fn submit_job_event(time: f64, job: &Job, profile: Option<&Profile>) -> BatsimEvent {
     let p = match profile {
         Some(prof) => Some(prof.clone()),
-        None => None
+        None => None,
     };
     BatsimEvent::SUBMIT_JOB {
         timestamp: time,
         data: SubmitJob {
             job_id: job.id.clone(),
             job: job.clone(),
-            profile: p
+            profile: p,
         },
     }
 }

@@ -201,7 +201,6 @@ impl<'a> Batsim<'a> {
         let mut next: Option<BatsimMessage> = self.get_next_message();
 
         'main: while let Some(msg) = next {
-            trace!("-----------------------------------------");
             trace!("Received msg: {:?}", msg);
             self.time = msg.now;
             let mut schedule_timestamp: f64 = msg.now;
@@ -219,7 +218,10 @@ impl<'a> Batsim<'a> {
                         panic!("Received simulation_begins,
                                this should not happends at this point");
                     }
-                    BatsimEvent::JOB_SUBMITTED { ref data, ref timestamp } => {
+                    BatsimEvent::JOB_SUBMITTED {
+                        ref data,
+                        ref timestamp,
+                    } => {
 
                         match self.scheduler
                                   .on_job_submission(&mut schedule_timestamp,
@@ -271,10 +273,9 @@ impl<'a> Batsim<'a> {
             };
 
             res.now = schedule_timestamp;
+            trace!("Send msg to batsim: {:?}", res);
             try!(self.send_message(res));
             next = self.get_next_message();
-            trace!("Send msg to batsim");
-            trace!("-----------------------------------------");
         }
         Ok(())
     }

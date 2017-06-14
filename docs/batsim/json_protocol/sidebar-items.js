@@ -1,0 +1,1 @@
+initSidebarItems({"enum":[["BatsimEvent",""],["Profile",""]],"struct":[["BatsimMessage",""],["ExecuteJob",""],["Job",""],["JobCompleted",""],["JobKilled",""],["JobSubmitted",""],["KillJob",""],["Notify",""],["RejectJob",""],["SimulationBegins",""],["SubmitJob",""]]});

@@ -32,7 +32,7 @@ pub trait Scheduler {
     /// When a job is finished batsim will inform the scheduler with this function.
     ///
     /// * `self` Take a reference mutable on the scheduler so we can update it.
-    /// * `timestamp` The current timestamp of the simulation.
+    /// * `timestamp` The at which the event occured
     /// * `job_id` The string id of the terminated job.
     /// * `status` The return status of the job.
     #[warn(unused_variables)]
@@ -59,7 +59,9 @@ pub trait Scheduler {
     #[warn(unused_variables)]
     fn on_message_received_begin(&mut self, timestamp: &f64) -> Option<Vec<BatsimEvent>>;
 
-    /// This function is call a the end of the simulation.
+    /// This function is called a the end of the simulation.
+    /// The timestamp is mutable so we can let the scheduler
+    /// the time it it spend on schedling
     #[warn(unused_variables)]
     fn on_simulation_ends(&mut self, timestamp: &f64);
 }

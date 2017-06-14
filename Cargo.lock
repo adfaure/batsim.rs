@@ -1,6 +1,6 @@
 [root]
-name = "batsim"
-version = "0.0.1"
+name = "batsim-rs"
+version = "0.1.0"
 dependencies = [
  "env_logger 0.4.3 (registry+https://github.com/rust-lang/crates.io-index)",
  "log 0.3.8 (registry+https://github.com/rust-lang/crates.io-index)",

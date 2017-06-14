@@ -1,7 +1,14 @@
 [package]
-name = "batsim"
-version = "0.0.1"
+name = "batsim-rs"
+version = "0.1.0"
 authors = [ "FAURE Adrien <adrien.faure2@gmail.com>" ]
+readme = "README.md"
+documentation = "https://adfaure.github.io/batsim.rs/interval_set/"
+homepage = "https://gitlab.inria.fr/adfaure/procset.rs"
+license = "MIT"
+description = """
+  API written in rust for the batsim - Batch scheduler simulator.
+"""
 
 [lib]
 name = "batsim"

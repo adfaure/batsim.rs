@@ -7,7 +7,6 @@ extern crate serde_json;
 use json_protocol::*;
 use self::serde_json::Error;
 use std::fmt;
-use std::str::FromStr;
 
 /// Base trait to implement scheduler for batsim.
 pub trait Scheduler {
@@ -16,7 +15,7 @@ pub trait Scheduler {
     /// configuration (optional) and the original timestamp.
     #[warn(unused_variables)]
     fn simulation_begins(&mut self,
-                         timestamp: &mut f64,
+                         timestamp: &f64,
                          nb_resources: i32,
                          config: serde_json::Value)
                          -> Option<Vec<BatsimEvent>>;
@@ -25,7 +24,7 @@ pub trait Scheduler {
     /// This function can return an array of Batsim event to send back to batsim.
     #[warn(unused_variables)]
     fn on_job_submission(&mut self,
-                         timestamp: &mut f64,
+                         timestamp: &f64,
                          job: Job,
                          profile: Option<Profile>)
                          -> Option<Vec<BatsimEvent>>;
@@ -38,7 +37,7 @@ pub trait Scheduler {
     /// * `status` The return status of the job.
     #[warn(unused_variables)]
     fn on_job_completed(&mut self,
-                        timestamp: &mut f64,
+                        timestamp: &f64,
                         job_id: String,
                         status: String)
                         -> Option<Vec<BatsimEvent>>;
@@ -47,7 +46,7 @@ pub trait Scheduler {
     /// the killed job.
     #[warn(unused_variables)]
     fn on_job_killed(&mut self,
-                     timestamp: &mut f64,
+                     timestamp: &f64,
                      job_ids: Vec<String>)
                      -> Option<Vec<BatsimEvent>>;
 
@@ -58,15 +57,15 @@ pub trait Scheduler {
 
     /// The function is called just before sending back events to batsim.
     #[warn(unused_variables)]
-    fn on_message_received_begin(&mut self, timestamp: &mut f64) -> Option<Vec<BatsimEvent>>;
+    fn on_message_received_begin(&mut self, timestamp: &f64) -> Option<Vec<BatsimEvent>>;
 
     /// This function is call a the end of the simulation.
     #[warn(unused_variables)]
-    fn on_simulation_ends(&mut self, timestamp: &mut f64);
+    fn on_simulation_ends(&mut self, timestamp: &f64);
 }
 
 pub struct Batsim<'a> {
-    zmq_context: zmq::Context,
+    //zmq_context: zmq::Context,
     zmq_socket: zmq::Socket,
     time: f64,
     nb_resources: i32,
@@ -124,7 +123,7 @@ impl<'a> Batsim<'a> {
 
         Batsim {
             scheduler: scheduler,
-            zmq_context: context,
+            //zmq_context: context,
             zmq_socket: socket,
             time: -1.0,
             nb_resources: -1,
@@ -207,7 +206,7 @@ impl<'a> Batsim<'a> {
             let mut res = self.get_nop().unwrap();
 
             match self.scheduler
-                      .on_message_received_begin(&mut schedule_timestamp) {
+                      .on_message_received_begin(&schedule_timestamp) {
                 Some(mut events) => res.events.append(&mut events),
                 None => {}
             };
@@ -224,7 +223,7 @@ impl<'a> Batsim<'a> {
                     } => {
 
                         match self.scheduler
-                                  .on_job_submission(&mut schedule_timestamp,
+                                  .on_job_submission(timestamp,
                                                      data.job.clone(),
                                                      data.profile.clone()) {
                             Some(mut events) => res.events.append(&mut events),
@@ -234,7 +233,7 @@ impl<'a> Batsim<'a> {
                     //
                     BatsimEvent::SIMULATION_ENDS { ref timestamp } => {
                         self.scheduler
-                            .on_simulation_ends(&mut schedule_timestamp);
+                            .on_simulation_ends(timestamp);
                         next = None;
                         try!(self.send_message(res));
                         continue 'main;
@@ -244,7 +243,7 @@ impl<'a> Batsim<'a> {
                         ref timestamp,
                     } => {
                         match self.scheduler
-                                  .on_job_completed(&mut schedule_timestamp,
+                                  .on_job_completed(timestamp,
                                                     data.job_id.clone(),
                                                     data.status.clone()) {
                             Some(mut events) => res.events.append(&mut events),
@@ -256,7 +255,7 @@ impl<'a> Batsim<'a> {
                         ref timestamp,
                     } => {
                         match self.scheduler
-                                  .on_job_killed(&mut schedule_timestamp,
+                                  .on_job_killed(timestamp,
                                                  data.job_ids.clone()) {
                             Some(mut events) => res.events.append(&mut events),
                             None => {}
@@ -319,7 +318,6 @@ pub fn submit_job_event(time: f64, job: &Job, profile: Option<&Profile>) -> Bats
         },
     }
 }
-
 
 pub fn kill_jobs_event(time: f64, jobs: Vec<&Job>) -> BatsimEvent {
     let mut job_ids = vec![];

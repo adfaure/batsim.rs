@@ -3,7 +3,6 @@ extern crate zmq;
 
 use json_protocol::*;
 
-use std::collections::LinkedList;
 use std::collections::HashMap;
 
 pub struct Workload {

@@ -9,7 +9,7 @@ extern crate env_logger;
 
 pub mod json_protocol;
 pub mod batsim;
-pub mod workload;
+// pub mod workload; // WIP
 
 pub use batsim::*;
 pub use json_protocol::*;

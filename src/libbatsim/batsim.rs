@@ -116,12 +116,13 @@ impl fmt::Display for Job {
 
 impl<'a> Batsim<'a> {
     /// Constructs a new `Batsim`.
-    pub fn new(scheduler: &'a mut Scheduler) -> Batsim<'a> {
-        let socket_url = "tcp://*:28000";
+    pub fn new(scheduler: &'a mut Scheduler, endpointport: Option<i64>) -> Batsim<'a> {
+
+        let socket_url = format!("tcp://*:{}", endpointport.unwrap_or(28000));
 
         let context = zmq::Context::new();
         let socket = context.socket(zmq::REP).unwrap();
-        assert!(socket.bind(socket_url).is_ok());
+        assert!(socket.bind(socket_url.as_str()).is_ok());
 
         Batsim {
             scheduler: scheduler,

@@ -245,10 +245,11 @@ impl<'a> Batsim<'a> {
                         ref data,
                         ref timestamp,
                     } => {
+                        trace!("[{:?}]JOB_COMPLETED data={:?}", timestamp, data);
                         match self.scheduler
                                   .on_job_completed(timestamp,
                                                     data.job_id.clone(),
-                                                    data.status.clone()) {
+                                                    data.job_state.clone()) {
                             Some(mut events) => res.events.append(&mut events),
                             None => {}
                         };
@@ -264,7 +265,13 @@ impl<'a> Batsim<'a> {
                             None => {}
                         };
                     }
-                    _ => panic!("Unexpected event"),
+                    BatsimEvent::NOTIFY {
+                        ref data,
+                        ref timestamp,
+                    } => {
+                        trace!("NOTIFY MESSAGE={:?}-{:?}", timestamp, data)
+                    }
+                    e => panic!("Unexpected event: {:?}", e),
                 }
             }
 

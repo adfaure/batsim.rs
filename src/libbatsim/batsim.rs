@@ -39,7 +39,9 @@ pub trait Scheduler {
     fn on_job_completed(&mut self,
                         timestamp: &f64,
                         job_id: String,
-                        status: String)
+                        job_state: String,
+                        return_code: i32,
+                        alloc: String)
                         -> Option<Vec<BatsimEvent>>;
 
     /// When the scheduler kill on or several jobs batsim acknoiwledge by sending back the id of
@@ -248,7 +250,9 @@ impl<'a> Batsim<'a> {
                         match self.scheduler
                                   .on_job_completed(timestamp,
                                                     data.job_id.clone(),
-                                                    data.status.clone()) {
+                                                    data.job_state.clone(),
+                                                    data.return_code.clone(),
+                                                    data.alloc.clone()) {
                             Some(mut events) => res.events.append(&mut events),
                             None => {}
                         };
@@ -264,7 +268,13 @@ impl<'a> Batsim<'a> {
                             None => {}
                         };
                     }
-                    _ => panic!("Unexpected event"),
+                   BatsimEvent::NOTIFY {
+                        ref timestamp,
+                        ref data,
+                    } => {
+                        trace!("Notify: {:?}", data);
+                    }
+                    e => panic!("Unexpected event {:?}", e),
                 }
             }
 

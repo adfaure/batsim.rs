@@ -16,7 +16,7 @@ name = "batsim"
 path = "src/libbatsim/lib.rs"
 
 [dependencies]
-zmq = "0.8"
+zmq = "0.9"
 serde = "1.0"
 serde_derive = "1.0"
 serde_json = "1.0"

@@ -68,7 +68,9 @@ pub struct JobKilled {
 #[derive(Debug, Serialize, Deserialize)]
 pub struct JobCompleted {
     pub job_id: String,
-    pub status: String,
+    pub job_state: String,
+    pub return_code: i32,
+    pub alloc: String,
 }
 
 #[derive(Debug, Serialize, Deserialize)]

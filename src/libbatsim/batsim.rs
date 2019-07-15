@@ -1,11 +1,11 @@
-extern crate log;
 extern crate env_logger;
+extern crate log;
 extern crate zmq;
 
 extern crate serde_json;
 
-use json_protocol::*;
 use self::serde_json::Error;
+use json_protocol::*;
 use std::fmt;
 
 /// Base trait to implement scheduler for batsim.
@@ -14,20 +14,22 @@ pub trait Scheduler {
     /// scheduler information on the simulations such as the number of resourcs available a
     /// configuration (optional) and the original timestamp.
     #[warn(unused_variables)]
-    fn simulation_begins(&mut self,
-                         timestamp: &f64,
-                         nb_resources: i32,
-                         config: serde_json::Value)
-                         -> Option<Vec<BatsimEvent>>;
+    fn simulation_begins(
+        &mut self,
+        timestamp: &f64,
+        nb_resources: i32,
+        config: serde_json::Value,
+    ) -> Option<Vec<BatsimEvent>>;
 
     /// When batsim receive a job from the submiter it will inform the scheduler.
     /// This function can return an array of Batsim event to send back to batsim.
     #[warn(unused_variables)]
-    fn on_job_submission(&mut self,
-                         timestamp: &f64,
-                         job: Job,
-                         profile: Option<Profile>)
-                         -> Option<Vec<BatsimEvent>>;
+    fn on_job_submission(
+        &mut self,
+        timestamp: &f64,
+        job: Job,
+        profile: Option<Profile>,
+    ) -> Option<Vec<BatsimEvent>>;
 
     /// When a job is finished batsim will inform the scheduler with this function.
     ///
@@ -36,21 +38,19 @@ pub trait Scheduler {
     /// * `job_id` The string id of the terminated job.
     /// * `status` The return status of the job.
     #[warn(unused_variables)]
-    fn on_job_completed(&mut self,
-                        timestamp: &f64,
-                        job_id: String,
-                        job_state: String,
-                        return_code: i32,
-                        alloc: String)
-                        -> Option<Vec<BatsimEvent>>;
+    fn on_job_completed(
+        &mut self,
+        timestamp: &f64,
+        job_id: String,
+        job_state: String,
+        return_code: i32,
+        alloc: String,
+    ) -> Option<Vec<BatsimEvent>>;
 
     /// When the scheduler kill on or several jobs batsim acknoiwledge by sending back the id of
     /// the killed job.
     #[warn(unused_variables)]
-    fn on_job_killed(&mut self,
-                     timestamp: &f64,
-                     job_ids: Vec<String>)
-                     -> Option<Vec<BatsimEvent>>;
+    fn on_job_killed(&mut self, timestamp: &f64, job_ids: Vec<String>) -> Option<Vec<BatsimEvent>>;
 
     /// The function is called at the reception of a message
     /// Before loop trhough each event and call `on_*` functions.
@@ -75,7 +75,6 @@ pub struct Batsim<'a> {
     nb_resources: i32,
     scheduler: &'a mut Scheduler,
 }
-
 
 impl Job {
     /// Split the job id in two parts `(workload id, job id)` as defined n batsim.
@@ -104,22 +103,19 @@ impl Clone for Job {
     }
 }
 
-
 impl fmt::Display for Job {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f,
-               "(id: {}\t,res: {},\t subtime: {},\t walltime: {})",
-               self.id,
-               self.res,
-               self.subtime,
-               self.walltime)
+        write!(
+            f,
+            "(id: {}\t,res: {},\t subtime: {},\t walltime: {})",
+            self.id, self.res, self.subtime, self.walltime
+        )
     }
 }
 
 impl<'a> Batsim<'a> {
     /// Constructs a new `Batsim`.
     pub fn new(scheduler: &'a mut Scheduler, endpointport: Option<i64>) -> Batsim<'a> {
-
         let socket_url = format!("tcp://*:{}", endpointport.unwrap_or(28000));
 
         let context = zmq::Context::new();
@@ -148,10 +144,11 @@ impl<'a> Batsim<'a> {
             } => {
                 let mut temp_timestamp = *timestamp;
                 self.nb_resources = data.nb_resources;
-                match self.scheduler
-                          .simulation_begins(&mut temp_timestamp,
-                                             data.nb_resources,
-                                             data.config.clone()) {
+                match self.scheduler.simulation_begins(
+                    &mut temp_timestamp,
+                    data.nb_resources,
+                    data.config.clone(),
+                ) {
                     Some(mut events) => res.events.append(&mut events),
                     None => {}
                 }
@@ -183,16 +180,14 @@ impl<'a> Batsim<'a> {
 
     pub fn get_nop(&self) -> Result<BatsimMessage, Error> {
         Ok(BatsimMessage {
-               now: self.time,
-               events: Vec::new(),
-           })
+            now: self.time,
+            events: Vec::new(),
+        })
     }
 
     pub fn send_message(&self, message: BatsimMessage) -> Result<(), Error> {
         let message_json = serde_json::to_string(&message).unwrap();
-        self.zmq_socket
-            .send_str(message_json.as_str(), 0)
-            .unwrap();
+        self.zmq_socket.send_str(message_json.as_str(), 0).unwrap();
         Ok(())
     }
 
@@ -210,8 +205,10 @@ impl<'a> Batsim<'a> {
             let mut schedule_timestamp: f64 = msg.now;
             let mut res = self.get_nop().unwrap();
 
-            match self.scheduler
-                      .on_message_received_begin(&schedule_timestamp) {
+            match self
+                .scheduler
+                .on_message_received_begin(&schedule_timestamp)
+            {
                 Some(mut events) => res.events.append(&mut events),
                 None => {}
             };
@@ -219,26 +216,27 @@ impl<'a> Batsim<'a> {
             for event in msg.events {
                 match event {
                     BatsimEvent::SIMULATION_BEGINS { .. } => {
-                        panic!("Received simulation_begins,
-                               this should not happends at this point");
+                        panic!(
+                            "Received simulation_begins,
+                               this should not happends at this point"
+                        );
                     }
                     BatsimEvent::JOB_SUBMITTED {
                         ref data,
                         ref timestamp,
                     } => {
-
-                        match self.scheduler
-                                  .on_job_submission(timestamp,
-                                                     data.job.clone(),
-                                                     data.profile.clone()) {
+                        match self.scheduler.on_job_submission(
+                            timestamp,
+                            data.job.clone(),
+                            data.profile.clone(),
+                        ) {
                             Some(mut events) => res.events.append(&mut events),
                             None => {}
                         };
                     }
                     //
                     BatsimEvent::SIMULATION_ENDS { ref timestamp } => {
-                        self.scheduler
-                            .on_simulation_ends(timestamp);
+                        self.scheduler.on_simulation_ends(timestamp);
                         next = None;
                         try!(self.send_message(res));
                         continue 'main;
@@ -247,12 +245,13 @@ impl<'a> Batsim<'a> {
                         ref data,
                         ref timestamp,
                     } => {
-                        match self.scheduler
-                                  .on_job_completed(timestamp,
-                                                    data.job_id.clone(),
-                                                    data.job_state.clone(),
-                                                    data.return_code.clone(),
-                                                    data.alloc.clone()) {
+                        match self.scheduler.on_job_completed(
+                            timestamp,
+                            data.job_id.clone(),
+                            data.job_state.clone(),
+                            data.return_code.clone(),
+                            data.alloc.clone(),
+                        ) {
                             Some(mut events) => res.events.append(&mut events),
                             None => {}
                         };
@@ -261,14 +260,15 @@ impl<'a> Batsim<'a> {
                         ref data,
                         ref timestamp,
                     } => {
-                        match self.scheduler
-                                  .on_job_killed(timestamp,
-                                                 data.job_ids.clone()) {
+                        match self
+                            .scheduler
+                            .on_job_killed(timestamp, data.job_ids.clone())
+                        {
                             Some(mut events) => res.events.append(&mut events),
                             None => {}
                         };
                     }
-                   BatsimEvent::NOTIFY {
+                    BatsimEvent::NOTIFY {
                         ref timestamp,
                         ref data,
                     } => {
@@ -278,8 +278,10 @@ impl<'a> Batsim<'a> {
                 }
             }
 
-            match self.scheduler
-                      .on_message_received_end(&mut schedule_timestamp) {
+            match self
+                .scheduler
+                .on_message_received_end(&mut schedule_timestamp)
+            {
                 Some(mut events) => res.events.append(&mut events),
                 None => {}
             };
@@ -299,6 +301,7 @@ pub fn allocate_job_event(time: f64, job: &Job, allocation: String) -> BatsimEve
         data: ExecuteJob {
             job_id: job.id.clone(),
             alloc: allocation,
+            mapping: None,
         },
     }
 }
@@ -306,14 +309,18 @@ pub fn allocate_job_event(time: f64, job: &Job, allocation: String) -> BatsimEve
 pub fn reject_job_event(time: f64, job: &Job) -> BatsimEvent {
     BatsimEvent::REJECT_JOB {
         timestamp: time,
-        data: RejectJob { job_id: job.id.clone() },
+        data: RejectJob {
+            job_id: job.id.clone(),
+        },
     }
 }
 
 pub fn notify_event(time: f64, n_type: String) -> BatsimEvent {
     BatsimEvent::NOTIFY {
         timestamp: time,
-        data: Notify { notify_type: n_type.clone() },
+        data: Notify {
+            notify_type: n_type.clone(),
+        },
     }
 }
 
@@ -343,13 +350,11 @@ pub fn kill_jobs_event(time: f64, jobs: Vec<&Job>) -> BatsimEvent {
     }
 }
 
-
 ///Convert a json fromated string into a typed rust struct `BatsimMessage`.
 pub fn read_batsim_message(msg_str: &str) -> Result<BatsimMessage, Error> {
     let message: BatsimMessage = match serde_json::from_str(msg_str) {
         Ok(value) => value,
         Err(why) => panic!("{:?} full str: {}", why, msg_str),
     };
-
     Ok(message)
 }

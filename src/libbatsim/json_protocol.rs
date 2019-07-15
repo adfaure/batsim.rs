@@ -1,3 +1,4 @@
+use std::collections::HashSet;
 extern crate serde_json;
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -53,6 +54,7 @@ pub struct RejectJob {
 pub struct ExecuteJob {
     pub job_id: String,
     pub alloc: String,
+    pub mapping: Option<HashSet<(String, String)>>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -88,17 +90,43 @@ pub enum BatsimEvent {
         timestamp: f64,
         data: SimulationBegins,
     },
-    JOB_SUBMITTED { timestamp: f64, data: JobSubmitted },
-    SIMULATION_ENDS { timestamp: f64 },
-    JOB_COMPLETED { timestamp: f64, data: JobCompleted },
-    JOB_KILLED { timestamp: f64, data: JobKilled },
+    JOB_SUBMITTED {
+        timestamp: f64,
+        data: JobSubmitted,
+    },
+    SIMULATION_ENDS {
+        timestamp: f64,
+    },
+    JOB_COMPLETED {
+        timestamp: f64,
+        data: JobCompleted,
+    },
+    JOB_KILLED {
+        timestamp: f64,
+        data: JobKilled,
+    },
 
     /// From sched to batsim
-    EXECUTE_JOB { timestamp: f64, data: ExecuteJob },
-    REJECT_JOB { timestamp: f64, data: RejectJob },
-    KILL_JOB { timestamp: f64, data: KillJob },
+    EXECUTE_JOB {
+        timestamp: f64,
+        data: ExecuteJob,
+    },
+    REJECT_JOB {
+        timestamp: f64,
+        data: RejectJob,
+    },
+    KILL_JOB {
+        timestamp: f64,
+        data: KillJob,
+    },
 
     /// Dynamic submit feature
-    SUBMIT_JOB { timestamp: f64, data: SubmitJob },
-    NOTIFY { timestamp: f64, data: Notify },
+    SUBMIT_JOB {
+        timestamp: f64,
+        data: SubmitJob,
+    },
+    NOTIFY {
+        timestamp: f64,
+        data: Notify,
+    },
 }

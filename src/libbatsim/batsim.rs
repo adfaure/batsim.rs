@@ -4,6 +4,7 @@ extern crate zmq;
 
 extern crate serde_json;
 
+use std::collections::HashMap;
 use self::serde_json::Error;
 use json_protocol::*;
 use std::fmt;
@@ -99,6 +100,7 @@ impl Clone for Job {
             profile: self.profile.clone(),
             subtime: self.subtime,
             walltime: self.walltime,
+            other: self.other.clone(),
         }
     }
 }
@@ -295,13 +297,13 @@ impl<'a> Batsim<'a> {
     }
 }
 
-pub fn allocate_job_event(time: f64, job: &Job, allocation: String) -> BatsimEvent {
+pub fn allocate_job_event(time: f64, job: &Job, allocation: String, mapping: Option<HashMap<String, String>>) -> BatsimEvent {
     BatsimEvent::EXECUTE_JOB {
         timestamp: time,
         data: ExecuteJob {
             job_id: job.id.clone(),
             alloc: allocation,
-            mapping: None,
+            mapping: mapping,
         },
     }
 }

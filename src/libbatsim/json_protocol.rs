@@ -1,5 +1,8 @@
-use std::collections::HashSet;
 extern crate serde_json;
+use std::collections::HashMap;
+use std::collections::BTreeMap as Map;
+use serde_json::Value;
+
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Job {
@@ -8,6 +11,8 @@ pub struct Job {
     pub profile: String,
     pub subtime: f64,
     pub walltime: f64,
+    #[serde(flatten)]
+    pub other: Map<String, Value>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -54,7 +59,8 @@ pub struct RejectJob {
 pub struct ExecuteJob {
     pub job_id: String,
     pub alloc: String,
-    pub mapping: Option<HashSet<(String, String)>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub mapping: Option<HashMap<String, String>>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
